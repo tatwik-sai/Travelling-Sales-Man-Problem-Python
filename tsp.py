@@ -1,7 +1,10 @@
-import pygame
-from itertools import permutations
 import math
 import threading
+from itertools import permutations
+
+import pygame
+
+from search import Search
 
 pygame.init()
 
@@ -15,6 +18,7 @@ class TSP:
         # Variables
         self.running = True
         self.min_distance = 50
+        self.point_size = 20
         self.points = []
         self.center_points = []
         self.distances = {}
@@ -33,7 +37,6 @@ class TSP:
         self.screen = pygame.display.set_mode(self.screen_size)
         pygame.display.set_caption("TSP")
         pygame.display.set_icon(pygame.image.load('graph-icon.png'))
-        self.point_size = 20
 
         # Colors
         self.bg_color = (39, 38, 39)
@@ -253,7 +256,7 @@ class TSP:
 
         pygame.display.update()
 
-    def cost(self, path: tuple) -> float:
+    def cost(self, path) -> float:
         """
         Returns the cost of the tour.
         :param path: The path of the tour.
@@ -264,6 +267,9 @@ class TSP:
             end = i + 1 if i < self.num_points - 1 else 0
             cost += self.distances[path[i] + "-" + path[end]]
         return cost
+
+    def fitness(self, path):
+        return 1 / self.cost(path)
 
     def construct_path(self, path):
         """
@@ -304,6 +310,55 @@ class TSP:
             self.solve_button_color = (255, 255, 255)
             self.solving = False
 
+    def genetic_solve(self):
+        from random import shuffle, random
+
+        # Initial Population
+        population = []
+        for _ in range(1000):
+            points = [str(i) for i in range(self.num_points)]
+            shuffle(points)
+            population.append(points)
+
+        def cross_over(parent_1, parent_2):
+            def single_cross_over(parent1, parent2):
+                child = []
+                childP1 = []
+                childP2 = []
+
+                geneA = int(random() * len(parent1))
+                geneB = int(random() * len(parent1))
+
+                startGene = min(geneA, geneB)
+                endGene = max(geneA, geneB)
+
+                for i in range(startGene, endGene):
+                    childP1.append(parent1[i])
+
+                childP2 = [item for item in parent2 if item not in childP1]
+
+                child = childP1 + childP2
+                return child
+
+            return [single_cross_over(parent_1, parent_2), single_cross_over(parent_2, parent_1)]
+
+        def mutate(individual):
+            for swapped in range(len(individual)):
+                swapWith = int(random() * len(individual))
+
+                city1 = individual[swapped]
+                city2 = individual[swapWith]
+
+                individual[swapped] = city2
+                individual[swapWith] = city1
+            return individual
+
+        search = Search(state=None, goal_test=None, next_states=None)
+        output = search.genetic_algorithm(population=population, fitness=self.fitness, crossover=cross_over,
+                                          epochs=300,
+                                          mutate=mutate, mutate_percent=0.4, k=500)
+        self.construct_path(output)
+
     def main(self):
         """
         Main function to handle the pygame loop.
@@ -326,5 +381,10 @@ class TSP:
             self.draw()
 
 
+"""
+Mouse Clicks:
+    left click: To add a point.
+    right click: To remove a point.
+"""
 tsp = TSP()
 tsp.main()
